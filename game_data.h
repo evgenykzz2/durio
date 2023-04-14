@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <avr/pgmspace.h>
+#include "Sprite.h"
 
 typedef uint8_t (*GetLevelBlock)(uint16_t x, uint8_t y);
 
@@ -13,6 +14,10 @@ extern const uint8_t s_game_palette_hills[64];
 extern const uint8_t s_block_chr[128*4] PROGMEM;
 extern const uint8_t s_block_pal[128] PROGMEM;
 
+#define SPRITE_MAX 8
+extern Sprite s_sprite[SPRITE_MAX];
+
+extern const uint8_t s_mario_chr[26*8] PROGMEM;
 
 enum EBlock
 {

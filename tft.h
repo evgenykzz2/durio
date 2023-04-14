@@ -1,5 +1,12 @@
 #pragma once
 #include <stdint.h>
+#include "Sprite.h"
+#include "game_data.h"
+
+#define TFT_WIDTH 320
+#define TFT_HEIGHT 240
+//#define TFT_WIDTH 480
+//#define TFT_HEIGHT 320
 
 #define MODE_ROW_ORDER 0x80
 #define MODE_COLUMN_ORDER 0x40
@@ -14,6 +21,8 @@ class Tft
 
   uint16_t m_screen_scroll_prev;
   uint16_t m_screen_scroll;
+  uint8_t  m_sprite_redraw_block[(TFT_WIDTH/16)*(TFT_HEIGHT/16)];
+  UpdateArea s_update_area[SPRITE_MAX];
 
 public:
   Tft();
@@ -34,4 +43,5 @@ public:
 
   void Durio_FullDrawScreen();
   void Durio_ScrollScreenDraw();
+  void Durio_DrawSprites();
 };

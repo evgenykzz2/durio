@@ -42,6 +42,19 @@ void setup()
     Serial.print(F("FullScreen: "));
     Serial.println(time1-time0);
   }
+
+  s_sprite[0].mode = SPRITE_MODE_2x2;
+  s_sprite[0].x = 32;
+  s_sprite[0].y = 16*12;
+  s_sprite[0].index[0] = 0x36;
+  s_sprite[0].index[1] = 0x37;
+  s_sprite[0].index[2] = 0x38;
+  s_sprite[0].index[3] = 0x39;
+
+  s_sprite[0].flag[0] = 0;
+  s_sprite[0].flag[1] = 0;
+  s_sprite[0].flag[2] = 0;
+  s_sprite[0].flag[3] = 0;
   
   g_time_millis = millis();
 }
@@ -49,5 +62,7 @@ void setup()
 void loop()
 {
   tft.Durio_ScrollScreenDraw();
+  ++s_sprite[0].x;
+  tft.Durio_DrawSprites();
   delay(33);
 }

@@ -4,12 +4,6 @@
 #include "game_data.h"
 #include "charset.h"
     
-#define TFT_WIDTH 320
-#define TFT_HEIGHT 240
-
-//#define TFT_WIDTH 480
-//#define TFT_HEIGHT 320
-
 #if defined(__AVR_ATmega328P__) // Arduino Uno
 
 static const int LCDpin[8] = {8, 9, 2, 3, 4, 5, 6, 7};
@@ -159,6 +153,9 @@ void Tft::Init()
   //Durio
   m_screen_scroll = 0;
   m_screen_scroll_prev = m_screen_scroll;
+  memset(m_sprite_redraw_block, 0, sizeof(m_sprite_redraw_block));
+  memset(s_sprite, 0, sizeof(s_sprite));
+  memset(s_update_area, 0, sizeof(s_update_area));
 }
 
 void Tft::VerticalScrollingDefinition( uint16_t top_fixed, uint16_t v_scroll, uint16_t bot_fixed )
@@ -482,4 +479,174 @@ void Tft::Durio_ScrollScreenDraw()
 
   m_screen_scroll_prev = m_screen_scroll;
   VerticalScrollingStartAddress( m_screen_scroll % 320);
+}
+
+void Tft::Durio_DrawSprites()
+{
+  memset(m_sprite_redraw_block, 0, sizeof(m_sprite_redraw_block));
+  uint16_t scroll = m_screen_scroll & 0xFFF0;
+  for (uint8_t n = 0; n < SPRITE_MAX; ++n)
+  {
+    if (s_update_area[n].width == 0)
+      continue;
+    {
+      int16_t block_x = (s_update_area[n].x - scroll) >> 4;
+      int16_t block_y = (s_update_area[n].y) >> 4;
+      if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+          block_y >= 0 && block_y < TFT_WIDTH/16)
+          m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+    }
+
+    {
+      int16_t block_x = (s_update_area[n].x + s_update_area[n].width - 1 - scroll) >> 4;
+      int16_t block_y = (s_update_area[n].y) >> 4;
+      if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+          block_y >= 0 && block_y < TFT_WIDTH/16)
+          m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+    }
+
+    {
+      int16_t block_x = (s_update_area[n].x - scroll) >> 4;
+      int16_t block_y = (s_update_area[n].y + s_update_area[n].height - 1) >> 4;
+      if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+          block_y >= 0 && block_y < TFT_WIDTH/16)
+          m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+    }
+
+    {
+      int16_t block_x = (s_update_area[n].x + s_update_area[n].width - 1 - scroll) >> 4;
+      int16_t block_y = (s_update_area[n].y + s_update_area[n].height - 1) >> 4;
+      if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+          block_y >= 0 && block_y < TFT_WIDTH/16)
+          m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+    }
+  }
+  memset(s_update_area, 0, sizeof(s_update_area));
+  
+  uint8_t area_index = 0;
+  for (uint8_t n = 0; n < SPRITE_MAX; ++n)
+  {
+    if (s_sprite[n].mode == SPRITE_MODE_NONE)
+      continue;
+    s_update_area[area_index].x = s_sprite[n].x;
+    s_update_area[area_index].y = s_sprite[n].y;
+    if (s_sprite[n].mode == SPRITE_MODE_2x2)
+    {
+      s_update_area[area_index].width = 16;
+      s_update_area[area_index].height = 16;
+
+      {
+        int16_t block_x = (s_sprite[n].x - scroll) >> 4;
+        int16_t block_y = (s_sprite[n].y) >> 4;
+        if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+            block_y >= 0 && block_y < TFT_WIDTH/16)
+            m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+      }
+
+      {
+        int16_t block_x = (s_sprite[n].x - scroll + 15) >> 4;
+        int16_t block_y = (s_sprite[n].y) >> 4;
+        if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+            block_y >= 0 && block_y < TFT_WIDTH/16)
+            m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+      }
+
+      {
+        int16_t block_x = (s_sprite[n].x - scroll) >> 4;
+        int16_t block_y = (s_sprite[n].y + 15) >> 4;
+        if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+            block_y >= 0 && block_y < TFT_WIDTH/16)
+            m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+      }
+
+      {
+        int16_t block_x = (s_sprite[n].x - scroll + 15) >> 4;
+        int16_t block_y = (s_sprite[n].y + 15) >> 4;
+        if (block_x >= 0 && block_x < TFT_WIDTH/16 &&
+            block_y >= 0 && block_y < TFT_WIDTH/16)
+            m_sprite_redraw_block[block_x + (block_y *(TFT_WIDTH/16))] = 1;
+      }
+    }
+    ++area_index;
+  }
+
+  //Now update redraw blocks
+  uint16_t index = 0;
+  for (uint8_t block_y = 0; block_y < TFT_HEIGHT/16; ++block_y)
+  {
+    for (uint8_t block_x = 0; block_x < TFT_WIDTH/16; ++block_x, ++index)
+    {
+      if (m_sprite_redraw_block[index] == 0)
+        continue;
+
+      uint16_t world_block_x = (scroll >> 4) + block_x;
+      uint8_t block = s_get_level_block(world_block_x, block_y);
+      uint8_t block_palette = pgm_read_byte_near(s_block_pal + block);
+      uint8_t color_offset = block_palette*4;
+
+      int16_t screen_start_x = (world_block_x << 4);
+      int16_t left_cut = 0;
+      if (screen_start_x < m_screen_scroll)
+        left_cut = m_screen_scroll - screen_start_x;
+
+      screen_start_x %= 320;
+      SetWindow(screen_start_x + left_cut, ((uint16_t)block_y)*16, screen_start_x+15, ((uint16_t)block_y)*16+15);
+
+      SendCmd(0x2c);
+      TFT_DATA_MODE
+
+      for (uint8_t y = 0; y < 16; ++y)
+      {
+        int16_t world_y = (block_y << 4) + y;
+        int16_t world_x = scroll + (block_x << 4) + left_cut;
+        uint8_t y_offset = (y & 0x07);
+        for (uint8_t x = left_cut; x < 16; ++x)
+        {
+          //Get Tile pixel
+          uint8_t bit_offset = 7 - (x & 0x07);
+          uint8_t chr_index = pgm_read_byte_near(s_block_chr + ( (((uint16_t)block)<<2) | (y>>3) | ((x >> 2) & 2)));
+          uint8_t b0 = pgm_read_byte_near(s_progmem_charset + (4096 | ((uint16_t)chr_index << 4) | y_offset));
+          uint8_t b1 = pgm_read_byte_near(s_progmem_charset + (4096 | ((uint16_t)chr_index << 4) | y_offset | 8));
+          uint8_t color = ((b0 >> bit_offset) & 1) | (((b1 >> bit_offset) & 1) << 1);
+          uint8_t nes_color = s_game_palette[color | color_offset];
+
+          //Get sprite pixel
+          for (uint8_t s = 0; s < SPRITE_MAX; ++s)
+          {
+            if (s_sprite[s].mode == SPRITE_MODE_NONE)
+              continue;
+            if (s_sprite[s].mode == SPRITE_MODE_2x2)
+            {
+              if ( world_x >= s_sprite[s].x && world_x < s_sprite[s].x + 16 &&
+                   world_y >= s_sprite[s].y && world_y < s_sprite[s].y + 16)
+                {
+                  int16_t s_x = world_x - s_sprite[s].x;
+                  int16_t s_y = world_y - s_sprite[s].y;
+                  uint8_t n = (s_x >> 3) | ((s_y >> 2) & 2);
+                  uint8_t chr_index = s_sprite[s].index[n];
+                  uint8_t b0 = pgm_read_byte_near(s_progmem_charset + (((uint16_t)chr_index << 4) | (s_y & 0x07)    ));
+                  uint8_t b1 = pgm_read_byte_near(s_progmem_charset + (((uint16_t)chr_index << 4) | (s_y & 0x07) | 8));
+                  uint8_t bit_offset = 7 - (s_x & 0x07);
+                  uint8_t color = ((b0 >> bit_offset) & 1) | (((b1 >> bit_offset) & 1) << 1);
+                  uint8_t color_offset = 16 | ( (s_sprite[s].flag[n] & 3) << 2);
+                  if (color != 0)
+                  {
+                    nes_color = s_game_palette[color | color_offset];
+                    break;
+                  }
+                }
+            }
+          }
+
+          TFT_DATAPIN_SET(s_palette[nes_color] >> 8);
+          TFT_SWAP_DATA_WR
+          TFT_DATAPIN_SET(s_palette[nes_color]);
+          TFT_SWAP_DATA_WR
+
+          ++world_x;
+        }
+      }
+      
+    }
+  }
 }
