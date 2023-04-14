@@ -12,6 +12,9 @@ class Tft
 {
   inline static void SetDataPin( uint8_t v );
 
+  uint16_t m_screen_scroll_prev;
+  uint16_t m_screen_scroll;
+
 public:
   Tft();
   void Init();
@@ -30,4 +33,5 @@ public:
   void TearingEffectLineOff();
 
   void Durio_FullDrawScreen();
+  void Durio_ScrollScreenDraw();
 };

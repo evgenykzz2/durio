@@ -48,5 +48,6 @@ void setup()
 
 void loop()
 {
-
+  tft.Durio_ScrollScreenDraw();
+  delay(33);
 }

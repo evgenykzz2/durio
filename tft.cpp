@@ -155,6 +155,10 @@ void Tft::Init()
     //| 0x40 //Column Address Order
     //| 0x80  //Row Address Order
     );  //32 -x/y flip 64 - y flip 128-xflip
+
+  //Durio
+  m_screen_scroll = 0;
+  m_screen_scroll_prev = m_screen_scroll;
 }
 
 void Tft::VerticalScrollingDefinition( uint16_t top_fixed, uint16_t v_scroll, uint16_t bot_fixed )
@@ -370,4 +374,112 @@ void Tft::Durio_FullDrawScreen()
       }
     }
   }
+}
+
+void Tft::Durio_ScrollScreenDraw()
+{
+  //Right scroll only
+  m_screen_scroll += 1;
+
+  uint16_t draw_start_x = m_screen_scroll_prev % 320;
+  uint16_t draw_width_x = m_screen_scroll - m_screen_scroll_prev;
+
+  for ( uint16_t x = 0; x < draw_width_x; ++x)
+  {
+    uint16_t world_x = m_screen_scroll_prev + TFT_WIDTH + x;
+    
+    SetWindow(draw_start_x+x, 0, draw_start_x+x, TFT_HEIGHT-1);
+    SendCmd(0x2c);
+    TFT_DATA_MODE
+    uint16_t block_x = world_x >> 4;
+    uint8_t offset_x = world_x & 15;
+      
+    for ( uint16_t block_y = 0; block_y < TFT_HEIGHT/16; ++block_y )
+    {
+      uint8_t block = s_get_level_block(block_x, block_y);
+      if (block == Block_Empty)
+      {
+        uint8_t hi = s_palette[s_game_palette[0]] >> 8;
+        uint8_t lo = s_palette[s_game_palette[0]];
+        for (uint16_t n = 0; n < 16; ++n)
+        {
+          TFT_DATAPIN_SET(hi);
+          TFT_SWAP_DATA_WR
+          TFT_DATAPIN_SET(lo);
+          TFT_SWAP_DATA_WR
+        }
+      } else
+      {
+        /*uint8_t hi = s_palette[s_game_palette[1]] >> 8;
+        uint8_t lo = s_palette[s_game_palette[1]];
+        for (uint16_t n = 0; n < 16; ++n)
+        {
+          TFT_DATAPIN_SET(hi);
+          TFT_SWAP_DATA_WR
+          TFT_DATAPIN_SET(lo);
+          TFT_SWAP_DATA_WR
+        }*/
+
+        uint8_t block_palette = pgm_read_byte_near(s_block_pal + block);
+        uint8_t color_offset = block_palette*4;
+        if (offset_x < 8)
+        {
+          uint8_t chr0 = pgm_read_byte_near(s_block_chr + ((uint16_t)block) * 4 + 0);
+          uint8_t chr2 = pgm_read_byte_near(s_block_chr + ((uint16_t)block) * 4 + 1);
+          uint8_t bit_offset = 7 - offset_x;
+          for (uint8_t y = 0; y < 8; ++y)
+          {
+            uint8_t b0 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr0 * 16) + y);
+            uint8_t b1 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr0 * 16) + y + 8);
+            uint8_t color = ((b0 >> bit_offset) & 1) | (((b1 >> bit_offset) & 1) << 1);
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]] >> 8);
+            TFT_SWAP_DATA_WR
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]]);
+            TFT_SWAP_DATA_WR
+          }
+
+          for (uint8_t y = 0; y < 8; ++y)
+          {
+            uint8_t b0 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr2 * 16) + y);
+            uint8_t b1 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr2 * 16) + y + 8);
+            uint8_t color = ((b0 >> bit_offset) & 1) | (((b1 >> bit_offset) & 1) << 1);
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]] >> 8);
+            TFT_SWAP_DATA_WR
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]]);
+            TFT_SWAP_DATA_WR
+          }
+        } else
+        {
+          uint8_t chr1 = pgm_read_byte_near(s_block_chr + ((uint16_t)block) * 4 + 2);
+          uint8_t chr3 = pgm_read_byte_near(s_block_chr + ((uint16_t)block) * 4 + 3);
+          uint8_t bit_offset = 7 - (offset_x-8);
+          for (uint8_t y = 0; y < 8; ++y)
+          {
+            uint8_t b0 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr1 * 16) + y);
+            uint8_t b1 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr1 * 16) + y + 8);
+            uint8_t color = ((b0 >> bit_offset) & 1) | (((b1 >> bit_offset) & 1) << 1);
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]] >> 8);
+            TFT_SWAP_DATA_WR
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]]);
+            TFT_SWAP_DATA_WR
+          }
+
+          for (uint8_t y = 0; y < 8; ++y)
+          {
+            uint8_t b0 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr3 * 16) + y);
+            uint8_t b1 = pgm_read_byte_near(s_progmem_charset + 4096 + ((uint16_t)chr3 * 16) + y + 8);
+            uint8_t color = ((b0 >> bit_offset) & 1) | (((b1 >> bit_offset) & 1) << 1);
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]] >> 8);
+            TFT_SWAP_DATA_WR
+            TFT_DATAPIN_SET(s_palette[s_game_palette[color | color_offset]]);
+            TFT_SWAP_DATA_WR
+          }
+        }
+
+      }
+    }
+  }
+
+  m_screen_scroll_prev = m_screen_scroll;
+  VerticalScrollingStartAddress( m_screen_scroll % 320);
 }
